@@ -44,7 +44,11 @@ class Config:
     ma_fast: int = _get_int("MA_FAST", 100)
     ma_slow: int = _get_int("MA_SLOW", 150)
     ma_type: str = os.getenv("MA_TYPE", "sma").strip().lower()
-    golden_cross_lookback: int = _get_int("GOLDEN_CROSS_LOOKBACK", 1)
+    # Stage 2 진입 완성(두 조건 중 하나가 새로 충족)을 최근 N영업일까지 인정.
+    # 1 = 오늘 완성된 것만. (구 GOLDEN_CROSS_LOOKBACK 도 호환)
+    signal_lookback: int = _get_int(
+        "SIGNAL_LOOKBACK", _get_int("GOLDEN_CROSS_LOOKBACK", 1)
+    )
 
     # Universe
     markets: list[str] = field(
@@ -62,9 +66,9 @@ class Config:
 
     @property
     def lookback_trading_days(self) -> int:
-        """필요한 최소 거래일 수 (가장 긴 선 + 골든크로스 판정 여유)."""
+        """필요한 최소 거래일 수 (가장 긴 선 + 신호 판정 여유)."""
         longest = max(self.ma_long, self.ma_slow, self.ma_fast)
-        return longest + self.golden_cross_lookback + 10
+        return longest + self.signal_lookback + 10
 
     def validate_telegram(self) -> None:
         if not self.telegram_bot_token or not self.telegram_chat_id:

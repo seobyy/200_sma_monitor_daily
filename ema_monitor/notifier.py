@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import html
 
+import pandas as pd
 import requests
 
 from config import CONFIG
@@ -25,6 +26,17 @@ def _fmt_won(value: float) -> str:
     return f"{value:,.0f}"
 
 
+def _when(date, ago: int) -> str:
+    """돌파 시점을 사람이 읽기 좋게. (오늘 / 5.30 (6일전) / 이전부터)"""
+    if ago is None or ago < 0 or date is None:
+        return "이전부터 충족"
+    ts = pd.Timestamp(date)
+    d = f"{ts.month}.{ts.day}"  # 5.30 형식 (크로스플랫폼)
+    if ago == 0:
+        return f"오늘 ({d}) 🆕"
+    return f"{d} ({ago}일전)"
+
+
 def _emoji_change(pct: float) -> str:
     if pct > 0:
         return "🔺"
@@ -34,18 +46,17 @@ def _emoji_change(pct: float) -> str:
 
 
 def build_message(hits: list[Hit], base_date) -> str:
-    import pandas as pd
     date_fmt = pd.Timestamp(base_date).strftime("%Y.%m.%d")
 
     header = (
-        f"📡 <b>추세·골든크로스 모니터</b>\n"
+        f"📈 <b>Stage 2 진입 모니터</b>\n"
         f"🗓 기준일 <b>{date_fmt}</b> (KRX 종가)\n"
-        f"🎯 조건: 종가 &gt; MA{CONFIG.ma_long} &amp; "
-        f"MA{CONFIG.ma_fast}↗MA{CONFIG.ma_slow} 골든크로스\n"
+        f"🎯 종가&gt;MA{CONFIG.ma_long} + MA{CONFIG.ma_fast}↗MA{CONFIG.ma_slow}, "
+        f"오늘 셋업 완성\n"
     )
 
     if not hits:
-        return header + "\n조건을 충족한 종목이 없습니다. 🤙"
+        return header + "\n오늘 셋업이 완성된 종목이 없습니다. 🤙"
 
     header += f"✨ <b>{len(hits)}개</b> 종목 포착\n" + "─" * 18 + "\n"
 
@@ -53,12 +64,13 @@ def build_message(hits: list[Hit], base_date) -> str:
     for i, h in enumerate(hits, 1):
         name = html.escape(h.name)
         gap = h.gap_pct  # 장기선 이격도
-        fresh = "🆕" if h.cross_ago == 0 else f"D-{h.cross_ago}"
         lines.append(
             f"{i}. <b>{name}</b> "
             f"<code>{h.ticker}</code> · {h.market}\n"
             f"   {_emoji_change(h.change_pct)} {h.close:,.0f}원 "
-            f"({h.change_pct:+.2f}%)  GC:{fresh}\n"
+            f"({h.change_pct:+.2f}%)\n"
+            f"   ① 종가&gt;MA{CONFIG.ma_long} 돌파: {_when(h.break_date, h.break_ago)}\n"
+            f"   ② MA{CONFIG.ma_fast}↗MA{CONFIG.ma_slow} GC: {_when(h.gc_date, h.gc_ago)}\n"
             f"   MA{CONFIG.ma_long} 이격 {gap:+.1f}% · "
             f"시총 {_fmt_won(h.market_cap)} · "
             f"거래대금 {_fmt_won(h.trading_value)}"

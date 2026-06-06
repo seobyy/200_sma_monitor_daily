@@ -58,7 +58,7 @@ jobs:
           MIN_MARKET_CAP: "100000000000"
           # 필요 시 여기서 파라미터 오버라이드 가능
           # MA_LONG: "200"
-          # GOLDEN_CROSS_LOOKBACK: "1"
+          # SIGNAL_LOOKBACK: "1"
         run: |
           ARGS="-v"
           # 자동(스케줄) 실행만 거래일 가드 적용. 수동 실행은 항상 전송.
