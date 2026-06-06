@@ -24,7 +24,7 @@ concurrency:
 jobs:
   monitor:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 60
     steps:
       - name: 코드 체크아웃
         uses: actions/checkout@v4
@@ -38,10 +38,9 @@ jobs:
       - name: 의존성 설치
         run: pip install -r requirements.txt
 
-      # 가격 이력 parquet 캐시 복원/저장 → 매일 백필 반복 방지.
-      # 항상 새 키로 저장하고, 가장 최근 prices-* 캐시를 복원한다.
+      # 가격 이력 parquet 캐시 '복원'. 저장은 마지막에 별도 스텝에서 always 로 수행.
       - name: 가격 캐시 복원
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: data
           key: prices-${{ github.run_id }}
@@ -52,6 +51,9 @@ jobs:
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          # 첫 백필을 빠르게: 동시 수집 워커 수 / 중간 저장 주기
+          BACKFILL_WORKERS: "8"
+          BACKFILL_SAVE_EVERY: "300"
           # 필요 시 .env 대신 여기서 파라미터 오버라이드 가능
           # MA_LONG: "200"
           # GOLDEN_CROSS_LOOKBACK: "1"
@@ -69,3 +71,11 @@ jobs:
           fi
           echo "실행: python run.py $ARGS"
           python run.py $ARGS
+
+      # 백필 진행분을 항상 저장 → 도중에 끊겨도 다음 실행에서 이어받음.
+      - name: 가격 캐시 저장
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: data
+          key: prices-${{ github.run_id }}

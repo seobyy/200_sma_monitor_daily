@@ -12,7 +12,9 @@
 from __future__ import annotations
 
 import datetime as dt
+import os
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import FinanceDataReader as fdr
 import pandas as pd
@@ -21,6 +23,13 @@ from tqdm import tqdm
 from config import CACHE_FILE, CONFIG
 
 _REF_TICKER = "005930"  # 삼성전자: 거래일 캘린더 기준
+
+
+def _get_env_int(key: str, default: int) -> int:
+    try:
+        return int(os.getenv(key, default))
+    except (TypeError, ValueError):
+        return default
 
 
 # ── 유니버스 / 스냅샷 ────────────────────────────────────────
@@ -81,18 +90,57 @@ def _save_cache(df: pd.DataFrame) -> None:
     df.sort_index().to_parquet(CACHE_FILE)
 
 
-def _backfill(codes: list[str], start: dt.date) -> dict[str, pd.Series]:
-    """종목별 종가 시계열 백필."""
-    out: dict[str, pd.Series] = {}
-    for code in tqdm(codes, desc="가격 이력 백필", unit="종목"):
+def _fetch_one(code: str, start: str, retries: int = 3):
+    """단일 종목 종가 시계열 (실패 시 재시도)."""
+    for attempt in range(retries):
         try:
-            px = fdr.DataReader(code, start.strftime("%Y-%m-%d"))
+            px = fdr.DataReader(code, start)
             if px is not None and not px.empty and "Close" in px.columns:
-                out[code] = px["Close"]
+                return code, px["Close"]
+            return code, None
         except Exception:
-            pass
-        time.sleep(0.05)
-    return out
+            time.sleep(0.4 * (attempt + 1))  # throttle 대비 백오프
+    return code, None
+
+
+def _merge(cache: pd.DataFrame, filled: dict[str, pd.Series]) -> pd.DataFrame:
+    if not filled:
+        return cache
+    new = pd.DataFrame(filled)
+    new.index = pd.to_datetime(new.index)
+    return new if cache.empty else cache.combine_first(new)
+
+
+def _backfill_into_cache(
+    cache: pd.DataFrame, codes: list[str], start: dt.date
+) -> pd.DataFrame:
+    """종목별 종가를 병렬 수집하고, 중간중간 캐시에 저장한다.
+
+    중간 저장 덕분에 도중에 끊겨도 다음 실행에서 받은 만큼 이어받는다.
+    """
+    start_str = start.strftime("%Y-%m-%d")
+    workers = max(1, _get_env_int("BACKFILL_WORKERS", 8))
+    save_every = max(50, _get_env_int("BACKFILL_SAVE_EVERY", 300))
+
+    buffer: dict[str, pd.Series] = {}
+    done = 0
+    with ThreadPoolExecutor(max_workers=workers) as ex:
+        futures = {ex.submit(_fetch_one, c, start_str): c for c in codes}
+        for fut in tqdm(as_completed(futures), total=len(futures),
+                        desc="가격 이력 백필", unit="종목"):
+            code, s = fut.result()
+            if s is not None:
+                buffer[code] = s
+            done += 1
+            if done % save_every == 0 and buffer:
+                cache = _merge(cache, buffer)
+                _save_cache(cache)
+                buffer = {}
+
+    if buffer:
+        cache = _merge(cache, buffer)
+        _save_cache(cache)
+    return cache
 
 
 # ── 종가 매트릭스 ────────────────────────────────────────────
@@ -118,13 +166,9 @@ def get_close_matrix(
         new_codes = [c for c in codes if c not in cache.columns]
         to_backfill = new_codes if only_latest_missing else codes
 
-    # 2) 백필 수행
+    # 2) 백필 수행 (병렬 + 중간 저장)
     if to_backfill:
-        filled = _backfill(to_backfill, start_date)
-        if filled:
-            new = pd.DataFrame(filled)
-            new.index = pd.to_datetime(new.index)
-            cache = new if cache.empty else cache.combine_first(new)
+        cache = _backfill_into_cache(cache, to_backfill, start_date)
 
     # 3) 당일 종가를 스냅샷에서 빠르게 보강 (백필이 못 채운 최신일)
     if latest not in cache.index or cache.loc[latest].isna().all():
