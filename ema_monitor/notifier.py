@@ -60,6 +60,7 @@ def build_message(hits: list[Hit], base_date) -> str:
             f"   {_emoji_change(h.change_pct)} {h.close:,.0f}원 "
             f"({h.change_pct:+.2f}%)  GC:{fresh}\n"
             f"   MA{CONFIG.ma_long} 이격 {gap:+.1f}% · "
+            f"시총 {_fmt_won(h.market_cap)} · "
             f"거래대금 {_fmt_won(h.trading_value)}"
         )
 

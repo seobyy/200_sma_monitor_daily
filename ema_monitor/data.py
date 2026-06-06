@@ -37,7 +37,7 @@ def get_listing() -> pd.DataFrame:
     """필터링된 전 종목 스냅샷.
 
     Returns DataFrame  index=code(str)
-        columns = name, market, close, change_pct, amount
+        columns = name, market, close, change_pct, amount, marketcap
     """
     raw = fdr.StockListing("KRX")
     df = raw.rename(
@@ -48,6 +48,7 @@ def get_listing() -> pd.DataFrame:
             "Close": "close",
             "ChagesRatio": "change_pct",  # FDR 철자(오타) 그대로
             "Amount": "amount",
+            "Marcap": "marketcap",        # 시가총액(원)
         }
     )
     df = df[df["market"].isin(CONFIG.markets)].copy()
@@ -60,7 +61,12 @@ def get_listing() -> pd.DataFrame:
     if CONFIG.exclude_preferred:
         df = df[df.index.str.endswith("0")]
 
-    keep = ["name", "market", "close", "change_pct", "amount"]
+    # 시가총액 필터
+    if CONFIG.min_market_cap and "marketcap" in df.columns:
+        mc = pd.to_numeric(df["marketcap"], errors="coerce")
+        df = df[mc >= CONFIG.min_market_cap]
+
+    keep = ["name", "market", "close", "change_pct", "amount", "marketcap"]
     return df[[c for c in keep if c in df.columns]]
 
 

@@ -57,6 +57,8 @@ class Config:
     exclude_spac: bool = _get_bool("EXCLUDE_SPAC", True)
     exclude_preferred: bool = _get_bool("EXCLUDE_PREFERRED", True)
     min_trading_value: int = _get_int("MIN_TRADING_VALUE", 0)
+    # 최소 시가총액(원). 0 이면 미적용. 기본 1000억.
+    min_market_cap: int = _get_int("MIN_MARKET_CAP", 100_000_000_000)
 
     @property
     def lookback_trading_days(self) -> int:

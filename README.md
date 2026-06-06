@@ -70,6 +70,7 @@ python run.py              # 스크리닝 후 텔레그램 전송
 | `EXCLUDE_SPAC` | `true` | 스팩 제외 |
 | `EXCLUDE_PREFERRED` | `true` | 우선주 제외(코드 끝자리≠0) |
 | `MIN_TRADING_VALUE` | `0` | 최소 거래대금(원) 필터, 0=미적용 |
+| `MIN_MARKET_CAP` | `100000000000` | 최소 시가총액(원) 필터, 0=미적용 (기본 1000억) |
 
 > 💡 골든크로스가 정확히 "당일" 발생한 종목은 날에 따라 0개일 수 있습니다.
 > 더 많은 후보를 보려면 `GOLDEN_CROSS_LOOKBACK` 을 3~5 정도로 키워보세요.

@@ -54,7 +54,9 @@ jobs:
           # 첫 백필을 빠르게: 동시 수집 워커 수 / 중간 저장 주기
           BACKFILL_WORKERS: "8"
           BACKFILL_SAVE_EVERY: "300"
-          # 필요 시 .env 대신 여기서 파라미터 오버라이드 가능
+          # 시가총액 1000억 이상만 모니터링
+          MIN_MARKET_CAP: "100000000000"
+          # 필요 시 여기서 파라미터 오버라이드 가능
           # MA_LONG: "200"
           # GOLDEN_CROSS_LOOKBACK: "1"
         run: |

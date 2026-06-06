@@ -27,6 +27,7 @@ class Hit:
     cross_ago: int          # 골든크로스가 며칠 전 발생했는지 (0=당일)
     change_pct: float       # 당일 등락률(%)
     trading_value: float    # 당일 거래대금(원)
+    market_cap: float = 0.0 # 시가총액(원)
 
     @property
     def gap_pct(self) -> float:
@@ -109,8 +110,9 @@ def build_hits(
             name = str(row.get("name", t))
             market = str(row.get("market", ""))
             tval = float(row.get("amount", 0.0) or 0.0)
+            mcap = float(row.get("marketcap", 0.0) or 0.0)
         else:
-            name, market, tval = t, "", 0.0
+            name, market, tval, mcap = t, "", 0.0, 0.0
 
         # 등락률은 매트릭스에서 직접 계산해 임의 기준일에도 정확하게.
         if prev_close is not None and prev_close.get(t):
@@ -133,6 +135,7 @@ def build_hits(
                 cross_ago=_cross_ago(close, t),
                 change_pct=change,
                 trading_value=tval,
+                market_cap=mcap,
             )
         )
 
