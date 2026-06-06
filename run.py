@@ -35,6 +35,8 @@ def main() -> int:
                         help="텔레그램 연결 테스트")
     parser.add_argument("--skip-if-closed", action="store_true",
                         help="오늘이 거래일이 아니면(주말/공휴일) 아무것도 안 하고 종료")
+    parser.add_argument("--as-of", metavar="YYYY-MM-DD", default=None,
+                        help="지정 일자(이하 마지막 거래일)를 기준으로 스크리닝")
     parser.add_argument("-v", "--verbose", action="store_true")
     args = parser.parse_args()
 
@@ -57,7 +59,11 @@ def main() -> int:
             return 0
 
     try:
-        hits = pipeline.run(dry_run=args.dry_run, force_refresh=args.refresh)
+        hits = pipeline.run(
+            dry_run=args.dry_run,
+            force_refresh=args.refresh,
+            as_of=args.as_of,
+        )
     except Exception as exc:  # noqa: BLE001
         logging.error("실행 실패: %s", exc)
         # 운영 중 오류도 텔레그램으로 알리고 싶으면 아래 주석 해제

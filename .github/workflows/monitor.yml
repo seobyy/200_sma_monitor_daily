@@ -11,6 +11,10 @@ on:
         description: "전송 없이 콘솔 미리보기"
         type: boolean
         default: false
+      as_of:
+        description: "기준일 YYYY-MM-DD (비우면 최근 거래일)"
+        type: string
+        default: ""
 
 # 동시에 한 번만 실행 (캐시 경쟁 방지)
 concurrency:
@@ -52,13 +56,16 @@ jobs:
           # MA_LONG: "200"
           # GOLDEN_CROSS_LOOKBACK: "1"
         run: |
-          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
-            # 수동 미리보기: 전송 없이 콘솔 출력
-            python run.py --dry-run -v
-          elif [ "${{ github.event_name }}" = "schedule" ]; then
-            # 자동(스케줄) 실행: 거래일이 아니면 스킵
-            python run.py --skip-if-closed -v
-          else
-            # 수동 실행: 거래일 가드 없이 항상 실제 전송 (테스트용)
-            python run.py -v
+          ARGS="-v"
+          # 자동(스케줄) 실행만 거래일 가드 적용. 수동 실행은 항상 전송.
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            ARGS="$ARGS --skip-if-closed"
           fi
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            ARGS="$ARGS --dry-run"
+          fi
+          if [ -n "${{ github.event.inputs.as_of }}" ]; then
+            ARGS="$ARGS --as-of ${{ github.event.inputs.as_of }}"
+          fi
+          echo "실행: python run.py $ARGS"
+          python run.py $ARGS

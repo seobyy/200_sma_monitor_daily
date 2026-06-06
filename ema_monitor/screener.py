@@ -100,6 +100,7 @@ def build_hits(
     ma_fast = _moving_average(close, CONFIG.ma_fast).iloc[-1]
     ma_slow = _moving_average(close, CONFIG.ma_slow).iloc[-1]
     last_close = close.iloc[-1]
+    prev_close = close.iloc[-2] if len(close) >= 2 else None
 
     hits: list[Hit] = []
     for t in tickers:
@@ -107,10 +108,15 @@ def build_hits(
             row = listing.loc[t]
             name = str(row.get("name", t))
             market = str(row.get("market", ""))
-            change = float(row.get("change_pct", 0.0) or 0.0)
             tval = float(row.get("amount", 0.0) or 0.0)
         else:
-            name, market, change, tval = t, "", 0.0, 0.0
+            name, market, tval = t, "", 0.0
+
+        # 등락률은 매트릭스에서 직접 계산해 임의 기준일에도 정확하게.
+        if prev_close is not None and prev_close.get(t):
+            change = (float(last_close[t]) / float(prev_close[t]) - 1) * 100
+        else:
+            change = float(row.get("change_pct", 0.0) or 0.0) if t in listing.index else 0.0
 
         if CONFIG.min_trading_value and tval < CONFIG.min_trading_value:
             continue
