@@ -1,0 +1,59 @@
+name: KRX 추세·골든크로스 모니터
+
+on:
+  schedule:
+    # GitHub Actions cron 은 UTC 기준.
+    # 09:00 UTC = 18:00 KST (장 마감 15:30 이후), 월~금 실행.
+    - cron: "0 9 * * 1-5"
+  workflow_dispatch:        # 수동 실행 버튼 (Actions 탭에서)
+    inputs:
+      dry_run:
+        description: "전송 없이 콘솔 미리보기"
+        type: boolean
+        default: false
+
+# 동시에 한 번만 실행 (캐시 경쟁 방지)
+concurrency:
+  group: krx-monitor
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: 파이썬 설정
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: 의존성 설치
+        run: pip install -r requirements.txt
+
+      # 가격 이력 parquet 캐시 복원/저장 → 매일 백필 반복 방지.
+      # 항상 새 키로 저장하고, 가장 최근 prices-* 캐시를 복원한다.
+      - name: 가격 캐시 복원
+        uses: actions/cache@v4
+        with:
+          path: data
+          key: prices-${{ github.run_id }}
+          restore-keys: |
+            prices-
+
+      - name: 모니터 실행
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          # 필요 시 .env 대신 여기서 파라미터 오버라이드 가능
+          # MA_LONG: "200"
+          # GOLDEN_CROSS_LOOKBACK: "1"
+        run: |
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            python run.py --dry-run -v
+          else
+            python run.py --skip-if-closed -v
+          fi
