@@ -53,7 +53,12 @@ jobs:
           # GOLDEN_CROSS_LOOKBACK: "1"
         run: |
           if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            # 수동 미리보기: 전송 없이 콘솔 출력
             python run.py --dry-run -v
-          else
+          elif [ "${{ github.event_name }}" = "schedule" ]; then
+            # 자동(스케줄) 실행: 거래일이 아니면 스킵
             python run.py --skip-if-closed -v
+          else
+            # 수동 실행: 거래일 가드 없이 항상 실제 전송 (테스트용)
+            python run.py -v
           fi
