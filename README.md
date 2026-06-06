@@ -76,7 +76,34 @@ python run.py              # 스크리닝 후 텔레그램 전송
 
 ---
 
-## ⏰ 매 영업일 자동 실행 (Windows 작업 스케줄러)
+## ☁️ 매 영업일 자동 실행 — GitHub Actions (추천)
+
+내 PC가 꺼져 있어도 GitHub 서버가 매일 돌려줍니다. 워크플로는
+`.github/workflows/monitor.yml` 에 포함되어 있습니다.
+
+1. **GitHub에 푸시**
+   ```powershell
+   git remote add origin https://github.com/<사용자명>/<레포명>.git
+   git push -u origin main
+   ```
+2. **Secrets 등록** — 레포 → *Settings* → *Secrets and variables* → *Actions* →
+   *New repository secret* 으로 아래 2개 추가
+   - `TELEGRAM_BOT_TOKEN`
+   - `TELEGRAM_CHAT_ID`
+3. **동작 확인** — *Actions* 탭 → "KRX 추세·골든크로스 모니터" →
+   *Run workflow* 로 수동 실행(테스트). 정상이면 매 평일 자동 실행됩니다.
+
+- 실행 시각: `cron: "0 9 * * 1-5"` = **매주 월~금 18:00 KST**(09:00 UTC).
+  바꾸려면 yml 의 cron 을 수정 (UTC 기준).
+- **가격 캐시**(`actions/cache`)로 첫 실행만 전 종목 백필하고, 이후는 빠르게 갱신.
+- 공휴일은 `--skip-if-closed` 로 자동 스킵됩니다.
+
+> ⚠️ GitHub cron 은 서버 부하 시 수~수십 분 지연될 수 있습니다(시간 엄수 X).
+> 무료 사용량: public 레포 무제한, private 레포도 월 2,000분으로 충분합니다.
+
+---
+
+## ⏰ (대안) 내 PC에서 자동 실행 — Windows 작업 스케줄러
 
 1. `run_daily.bat` 가 장 마감 후 실행되도록 등록합니다.
 2. **작업 스케줄러** → *작업 만들기*
