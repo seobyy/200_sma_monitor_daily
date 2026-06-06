@@ -26,15 +26,14 @@ def _fmt_won(value: float) -> str:
     return f"{value:,.0f}"
 
 
-def _when(date, ago: int) -> str:
-    """돌파 시점을 사람이 읽기 좋게. (오늘 / 5.30 (6일전) / 이전부터)"""
-    if ago is None or ago < 0 or date is None:
-        return "이전부터 충족"
-    ts = pd.Timestamp(date)
-    d = f"{ts.month}.{ts.day}"  # 5.30 형식 (크로스플랫폼)
-    if ago == 0:
-        return f"오늘 ({d}) 🆕"
-    return f"{d} ({ago}일전)"
+def _mark(ago: int) -> str:
+    """오늘 새로 달성됐으면 🆕, 이전부터 충족이면 ✅."""
+    return "🆕" if ago == 0 else "✅"
+
+
+def _tradingview(ticker: str) -> str:
+    """TradingView 차트 URL (KRX 심볼)."""
+    return f"https://www.tradingview.com/chart/?symbol=KRX%3A{ticker}"
 
 
 def _emoji_change(pct: float) -> str:
@@ -65,15 +64,13 @@ def build_message(hits: list[Hit], base_date) -> str:
         name = html.escape(h.name)
         gap = h.gap_pct  # 장기선 이격도
         lines.append(
-            f"{i}. <b>{name}</b> "
+            f"{i}. <a href=\"{_tradingview(h.ticker)}\"><b>{name}</b></a> "
             f"<code>{h.ticker}</code> · {h.market}\n"
             f"   {_emoji_change(h.change_pct)} {h.close:,.0f}원 "
             f"({h.change_pct:+.2f}%)\n"
-            f"   ① 종가&gt;MA{CONFIG.ma_long} 돌파: {_when(h.break_date, h.break_ago)}\n"
-            f"   ② MA{CONFIG.ma_fast}↗MA{CONFIG.ma_slow} GC: {_when(h.gc_date, h.gc_ago)}\n"
-            f"   MA{CONFIG.ma_long} 이격 {gap:+.1f}% · "
-            f"시총 {_fmt_won(h.market_cap)} · "
-            f"거래대금 {_fmt_won(h.trading_value)}"
+            f"   {_mark(h.break_ago)}① 종가&gt;MA{CONFIG.ma_long}  "
+            f"{_mark(h.gc_ago)}② MA{CONFIG.ma_fast}&gt;MA{CONFIG.ma_slow}\n"
+            f"   MA{CONFIG.ma_long} 이격 {gap:+.1f}% · 시총 {_fmt_won(h.market_cap)}"
         )
 
     return header + "\n".join(lines)

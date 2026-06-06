@@ -37,6 +37,11 @@ def run(
     log.info("종가 매트릭스 수집/캐시 갱신")
     close = data.get_close_matrix(listing, force_refresh=force_refresh)
 
+    # 스크리닝 대상을 현재 유니버스로 제한 (캐시에 남은 비대상 종목 제외).
+    universe_cols = [c for c in close.columns if c in listing.index]
+    close = close[universe_cols]
+    log.info("유니버스 정합 후 매트릭스 종목 수: %d", close.shape[1])
+
     if as_of:
         cutoff = pd.Timestamp(as_of)
         close = close.loc[close.index <= cutoff]
