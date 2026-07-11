@@ -114,7 +114,8 @@ def _merge(cache: pd.DataFrame, filled: dict[str, pd.Series]) -> pd.DataFrame:
         return cache
     new = pd.DataFrame(filled)
     new.index = pd.to_datetime(new.index)
-    return new if cache.empty else cache.combine_first(new)
+    # 새로 받은 실데이터(수정주가)가 기존 값(스냅샷 보강치)보다 우선
+    return new if cache.empty else new.combine_first(cache)
 
 
 def _backfill_into_cache(
@@ -165,8 +166,11 @@ def get_close_matrix(
     if cache.empty:
         to_backfill = codes
     else:
-        cached_days = set(cache.index)
-        missing_days = [d for d in needed if d not in cached_days]
+        # 캐시에 아예 없는 날뿐 아니라 값이 거의 비어 있는 날도 결손으로 본다.
+        # (신규상장 종목만 백필된 날은 그 종목 외 전부 NaN 인 '구멍' 행이 남아
+        #  rolling MA 전체를 NaN 으로 만든다 → 전 종목 재수집으로 복구)
+        row_fill = cache.reindex(needed).notna().mean(axis=1)
+        missing_days = [d for d in needed if row_fill.loc[d] < 0.5]
         # 최신일 1개만 빠진 정상적인 일일 갱신이면 백필 불필요
         only_latest_missing = missing_days in ([], [latest])
         new_codes = [c for c in codes if c not in cache.columns]
@@ -176,10 +180,14 @@ def get_close_matrix(
     if to_backfill:
         cache = _backfill_into_cache(cache, to_backfill, start_date)
 
-    # 3) 당일 종가를 스냅샷에서 빠르게 보강 (백필이 못 채운 최신일)
-    if latest not in cache.index or cache.loc[latest].isna().all():
-        snap_close = listing["close"].astype("float64")
+    # 3) 당일 종가를 스냅샷에서 빠르게 보강 (백필이 못 채운 최신일).
+    #    신규상장 백필 직후엔 최신일 행이 그 종목만 채워진 채 존재할 수 있으므로
+    #    행 유무가 아니라 셀 단위로 NaN 만 스냅샷 종가로 메운다.
+    snap_close = listing["close"].astype("float64")
+    if latest not in cache.index:
         cache.loc[latest] = snap_close
+    else:
+        cache.loc[latest] = cache.loc[latest].fillna(snap_close)
 
     cache = cache.sort_index()
     _save_cache(cache)
