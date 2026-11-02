@@ -74,6 +74,14 @@ jobs:
           echo "실행: python run.py $ARGS"
           python run.py $ARGS
 
+      - name: 플랫폼용 모니터 결과 보관
+        uses: actions/upload-artifact@v4
+        with:
+          name: ma-monitor-report
+          path: output/latest.json
+          if-no-files-found: ignore
+          retention-days: 30
+
       # 백필 진행분을 항상 저장 → 도중에 끊겨도 다음 실행에서 이어받음.
       - name: 가격 캐시 저장
         if: always()

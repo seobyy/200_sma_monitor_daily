@@ -6,6 +6,7 @@ import logging
 from config import CONFIG
 from ema_monitor import data, notifier, screener
 from ema_monitor.screener import Hit
+from ema_monitor.report import build_report, write_report
 
 log = logging.getLogger("ema_monitor")
 
@@ -67,4 +68,10 @@ def run(
         notifier.notify(hits, base_date)
         log.info("텔레그램 전송 완료")
 
+    # Export after the existing notification path, without changing its conditions.
+    # A completed zero-hit day is a valid report; holiday skips never reach here.
+    report = build_report(hits, base_date, CONFIG, len(listing), close.shape[1],
+                          int(close.iloc[-1].isna().sum()))
+    path = write_report(report)
+    log.info("플랫폼용 모니터 결과 저장: %s", path)
     return hits
